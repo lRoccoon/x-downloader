@@ -1,0 +1,19 @@
+# 部署用 compose：直接拉取 GHCR 上由 GitHub Actions 预构建的镜像，无需源码与本地构建。
+# 用法（在含本文件与 .env 的目录）：
+#   TAG=v1.0.0 docker compose -f docker-compose.deploy.yml up -d
+services:
+  x-downloader:
+    image: ghcr.io/lroccoon/x-downloader:${TAG:-latest}
+    container_name: x-downloader
+    # host 网络：容器与宿主共享网络，直接用宿主的 127.0.0.1:7890 clash 代理
+    network_mode: host
+    pull_policy: always
+    environment:
+      APP_PASSWORD: "${APP_PASSWORD:-changeme}"
+      SECRET_KEY: "${SECRET_KEY:-please-change-this-secret-key}"
+      THREADS: "${THREADS:-16}"
+      PROXY: "${PROXY:-}"
+    volumes:
+      - ./downloads:/downloads
+      - ./data:/data
+    restart: unless-stopped
