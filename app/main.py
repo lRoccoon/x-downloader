@@ -138,6 +138,20 @@ def retry_task(task_id: str):
     return {"ok": True}
 
 
+@app.post("/api/tasks/{task_id}/pause", dependencies=[Depends(require_auth)])
+def pause_task(task_id: str):
+    if not downloader.pause(task_id):
+        raise HTTPException(status_code=400, detail="任务不在下载中")
+    return {"ok": True}
+
+
+@app.post("/api/tasks/{task_id}/resume", dependencies=[Depends(require_auth)])
+def resume_task(task_id: str):
+    if not downloader.resume(task_id):
+        raise HTTPException(status_code=400, detail="任务不在暂停状态")
+    return {"ok": True}
+
+
 @app.delete("/api/tasks/{task_id}", dependencies=[Depends(require_auth)])
 def remove_task(task_id: str):
     db.delete_task(task_id)

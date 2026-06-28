@@ -4,11 +4,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadCancelled
 
 from . import config, db
 
 _executor = ThreadPoolExecutor(max_workers=3)
 _aria2c = shutil.which("aria2c") is not None
+_pause_flags: dict[str, bool] = {}  # task_id -> True 表示请求暂停
 
 
 def _find_ffmpeg():
@@ -32,6 +34,8 @@ def _base_opts() -> dict:
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
+        # 连接卡住时 15s 超时重试，避免永久阻塞；也保证暂停（靠 hook 检测）能及时生效
+        "socket_timeout": 15,
     }
     if config.PROXY:
         opts["proxy"] = config.PROXY
@@ -99,18 +103,22 @@ def probe(url: str) -> dict:
 
 def _make_hook(task_id: str):
     def hook(d):
+        if _pause_flags.get(task_id):
+            raise DownloadCancelled("用户暂停")
         status = d.get("status")
         if status == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
             done = d.get("downloaded_bytes") or 0
             progress = (done / total * 100) if total else 0
-            db.update_task(
-                task_id,
+            fields = dict(
                 status="downloading",
                 progress=round(progress, 1),
                 speed=d.get("_speed_str", "").strip() or None,
                 eta=d.get("_eta_str", "").strip() or None,
             )
+            if total:
+                fields["filesize"] = total  # 下载中显示估算总大小
+            db.update_task(task_id, **fields)
         elif status == "finished":
             # 分片合并前的 finished，进度置满，文件名稍后由 download() 落库
             db.update_task(task_id, progress=100, speed=None, eta=None)
@@ -118,6 +126,7 @@ def _make_hook(task_id: str):
 
 
 def _run_download(task_id: str, url: str, format_id: str) -> None:
+    _pause_flags.pop(task_id, None)
     db.update_task(task_id, status="downloading", progress=0, error=None)
     opts = _base_opts()
     opts.update({
@@ -159,6 +168,8 @@ def _run_download(task_id: str, url: str, format_id: str) -> None:
                 speed=None,
                 eta=None,
             )
+    except DownloadCancelled:
+        db.update_task(task_id, status="paused", speed=None, eta=None)
     except Exception as exc:  # noqa: BLE001
         db.update_task(task_id, status="error", error=str(exc)[:500])
 
@@ -175,6 +186,26 @@ def retry(task_id: str) -> bool:
     if not task:
         return False
     db.update_task(task_id, status="queued", progress=0, error=None, speed=None, eta=None)
+    _executor.submit(_run_download, task_id, task["url"], task["format_id"])
+    return True
+
+
+def pause(task_id: str) -> bool:
+    """请求暂停一个下载中的任务（保留已下载分片，可续传）。"""
+    task = db.get_task(task_id)
+    if not task or task.get("status") != "downloading":
+        return False
+    _pause_flags[task_id] = True
+    return True
+
+
+def resume(task_id: str) -> bool:
+    """继续一个已暂停的任务，yt-dlp 会从已下载分片断点续传。"""
+    task = db.get_task(task_id)
+    if not task or task.get("status") != "paused":
+        return False
+    _pause_flags.pop(task_id, None)
+    db.update_task(task_id, status="queued", error=None)
     _executor.submit(_run_download, task_id, task["url"], task["format_id"])
     return True
 

@@ -16,6 +16,7 @@
     <section class="card">
       <div class="row">
         <input type="text" id="urlInput" placeholder="粘贴 X (Twitter) 分享链接，例如 https://x.com/user/status/123...">
+        <button id="resetBtn" class="btn-secondary" title="清空链接与解析结果">重置</button>
         <button id="parseBtn">解析</button>
       </div>
       <div class="status-bar" id="cfgBar"></div>
@@ -65,10 +66,10 @@
       </div>
       <table id="taskTable">
         <thead>
-          <tr><th>标题</th><th>分辨率</th><th>状态 / 进度</th><th>操作</th></tr>
+          <tr><th>标题</th><th>分辨率</th><th>大小</th><th>状态 / 进度</th><th>操作</th></tr>
         </thead>
         <tbody id="taskBody">
-          <tr><td colspan="4" class="muted center">暂无任务</td></tr>
+          <tr><td colspan="5" class="muted center">暂无任务</td></tr>
         </tbody>
       </table>
     </section>

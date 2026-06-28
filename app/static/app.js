@@ -56,6 +56,15 @@ async function parse() {
   }
 }
 
+function resetUrl() {
+  $("urlInput").value = "";
+  $("parseError").textContent = "";
+  $("resultCard").classList.add("hidden");
+  currentUrl = "";
+  currentTitle = "";
+  $("urlInput").focus();
+}
+
 function renderResult(data) {
   currentTitle = data.title;
   $("vTitle").textContent = data.title;
@@ -116,7 +125,7 @@ async function refreshTasks() {
   const tasks = await res.json();
   const body = $("taskBody");
   if (!tasks.length) {
-    body.innerHTML = '<tr><td colspan="4" class="muted center">暂无任务</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="muted center">暂无任务</td></tr>';
     return;
   }
   body.innerHTML = tasks.map(renderTask).join("");
@@ -128,8 +137,11 @@ function renderTask(t) {
     const extra = [t.speed, t.eta ? `剩余 ${t.eta}` : ""].filter(Boolean).join(" · ");
     statusCell = `<div class="progress"><div class="bar" style="width:${t.progress}%"></div></div>
       <span class="small">${t.progress}% ${extra}</span>`;
+  } else if (t.status === "paused") {
+    statusCell = `<div class="progress"><div class="bar paused" style="width:${t.progress}%"></div></div>
+      <span class="small">⏸ 已暂停 · ${t.progress}%</span>`;
   } else if (t.status === "finished") {
-    statusCell = `<span class="badge ok">✅ 完成</span> <span class="small">${fmtSize(t.filesize)}</span>`;
+    statusCell = `<span class="badge ok">✅ 完成</span>`;
   } else if (t.status === "error") {
     const err = escapeHtml((t.error || "未知错误").slice(0, 200));
     statusCell = `<span class="badge err">❌ 失败</span><div class="err-msg" title="${escapeHtml(t.error || '')}">${err}</div>`;
@@ -138,6 +150,12 @@ function renderTask(t) {
   }
 
   let actions = "";
+  if (t.status === "downloading") {
+    actions += `<button class="link" onclick="pauseTask('${t.id}')">暂停</button> `;
+  }
+  if (t.status === "paused") {
+    actions += `<button class="link" onclick="resumeTask('${t.id}')">继续</button> `;
+  }
   if (t.status === "finished") {
     actions += `<a class="link" href="/api/tasks/${t.id}/file">下载到本地</a> `;
   }
@@ -149,6 +167,7 @@ function renderTask(t) {
   return `<tr>
     <td class="title-cell" title="${escapeHtml(t.title || '')}">${escapeHtml(t.title || t.url)}</td>
     <td>${t.resolution || ""}</td>
+    <td class="small">${fmtSize(t.filesize) || "—"}</td>
     <td>${statusCell}</td>
     <td>${actions}</td>
   </tr>`;
@@ -161,6 +180,16 @@ async function deleteTask(id) {
 
 async function retryTask(id) {
   await fetch(`/api/tasks/${id}/retry`, { method: "POST" });
+  refreshTasks();
+}
+
+async function pauseTask(id) {
+  await fetch(`/api/tasks/${id}/pause`, { method: "POST" });
+  refreshTasks();
+}
+
+async function resumeTask(id) {
+  await fetch(`/api/tasks/${id}/resume`, { method: "POST" });
   refreshTasks();
 }
 
@@ -195,6 +224,7 @@ async function saveToken() {
 }
 
 $("parseBtn").onclick = parse;
+$("resetBtn").onclick = resetUrl;
 $("urlInput").addEventListener("keydown", (e) => { if (e.key === "Enter") parse(); });
 $("uploadCookieBtn").onclick = uploadCookie;
 $("saveTokenBtn").onclick = saveToken;
