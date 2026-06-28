@@ -165,11 +165,11 @@ function renderTask(t) {
   actions += `<button class="link danger" onclick="deleteTask('${t.id}')">删除</button>`;
 
   return `<tr>
-    <td class="title-cell" title="${escapeHtml(t.title || '')}">${escapeHtml(t.title || t.url)}</td>
-    <td>${t.resolution || ""}</td>
-    <td class="small">${fmtSize(t.filesize) || "—"}</td>
-    <td>${statusCell}</td>
-    <td>${actions}</td>
+    <td class="title-cell" data-label="标题" title="${escapeHtml(t.title || '')}">${escapeHtml(t.title || t.url)}</td>
+    <td data-label="分辨率">${t.resolution || ""}</td>
+    <td class="small" data-label="大小">${fmtSize(t.filesize) || "—"}</td>
+    <td data-label="状态">${statusCell}</td>
+    <td data-label="操作">${actions}</td>
   </tr>`;
 }
 

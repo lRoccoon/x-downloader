@@ -82,7 +82,41 @@ input[type=file] { color: var(--muted); flex: 1; }
 body.center { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 .login-card {
   background: var(--card); border: 1px solid var(--line); border-radius: 16px;
-  padding: 36px; width: 340px; display: flex; flex-direction: column; gap: 14px; text-align: center;
+  padding: 36px; width: 340px; max-width: 88vw; display: flex; flex-direction: column; gap: 14px; text-align: center;
 }
 .login-card h1 { margin: 0; font-size: 22px; }
 .login-card input { width: 100%; }
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 640px) {
+  main { padding: 14px; }
+  header { padding: 12px 16px; }
+  header h1 { font-size: 17px; }
+  .card { padding: 14px; margin-bottom: 16px; }
+
+  /* 输入区换行：链接占整行，重置/解析按钮平分下一行 */
+  .row { flex-wrap: wrap; }
+  #urlInput { flex: 1 1 100%; }
+  #resetBtn, #parseBtn { flex: 1; }
+
+  /* 解析结果竖排，封面铺满 */
+  .result { flex-direction: column; }
+  .result img { width: 100%; max-height: 220px; object-fit: contain; }
+  .res-btn { flex: 1 1 calc(50% - 10px); }
+
+  .status-bar { font-size: 12px; }
+
+  /* 设置区 token 输入换行 */
+  .field { flex-wrap: wrap; }
+  .field label { width: auto; }
+  .field input { flex: 1 1 100%; }
+
+  /* 任务表格 -> 卡片式（避免多列在窄屏溢出） */
+  #taskTable thead { display: none; }
+  #taskTable, #taskTable tbody, #taskTable tr, #taskTable td { display: block; width: 100%; }
+  #taskTable tr { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; padding: 8px 12px; }
+  #taskTable td { border: none; padding: 5px 0; }
+  #taskTable td::before { content: attr(data-label) "："; color: var(--muted); font-size: 12px; margin-right: 6px; }
+  #taskTable .title-cell { max-width: none; white-space: normal; word-break: break-word; }
+  #taskTable .err-msg { max-width: none; }
+}
