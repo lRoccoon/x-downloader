@@ -1,0 +1,23 @@
+services:
+  x-downloader:
+    build: .
+    image: x-downloader:latest
+    container_name: x-downloader
+    # host 网络：容器与宿主共享网络栈，容器内可直连 127.0.0.1:7890 的 clash 代理
+    # （也意味着服务直接监听宿主 8000 端口，无需 ports 映射）
+    network_mode: host
+    environment:
+      # 访问密码（强烈建议设置）
+      APP_PASSWORD: "${APP_PASSWORD:-changeme}"
+      # 会话签名密钥，请改成随机字符串
+      SECRET_KEY: "${SECRET_KEY:-please-change-this-secret-key}"
+      # 下载线程数
+      THREADS: "${THREADS:-16}"
+      # HTTP 代理（host 网络模式下直接用宿主的 127.0.0.1:7890）
+      PROXY: "${PROXY:-}"
+    volumes:
+      # 视频保存到宿主机的 ./downloads
+      - ./downloads:/downloads
+      # cookies 与任务数据库持久化
+      - ./data:/data
+    restart: unless-stopped

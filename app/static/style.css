@@ -1,0 +1,85 @@
+* { box-sizing: border-box; }
+:root {
+  --bg: #0f1419; --card: #1a2230; --line: #2a3441;
+  --fg: #e7e9ea; --muted: #8b98a5; --accent: #1d9bf0; --ok: #00ba7c; --err: #f4212e;
+}
+body {
+  margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg); color: var(--fg); line-height: 1.5;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 20px; margin: 0; }
+main { max-width: 860px; margin: 0 auto; padding: 24px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px; margin-bottom: 20px;
+}
+.row { display: flex; gap: 10px; }
+input[type=text], input[type=password] {
+  flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: #0f1419; color: var(--fg); font-size: 15px;
+}
+input:focus { outline: none; border-color: var(--accent); }
+button {
+  padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+}
+button:disabled { opacity: .6; cursor: default; }
+button:hover:not(:disabled) { filter: brightness(1.1); }
+.link {
+  background: none; color: var(--accent); padding: 4px 6px; font-weight: 500; font-size: 14px;
+}
+.link.danger { color: var(--err); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; color: var(--muted); }
+.center { text-align: center; }
+.hidden { display: none; }
+.error { color: var(--err); margin-top: 10px; min-height: 18px; font-size: 14px; }
+.status-bar { margin-top: 12px; font-size: 13px; color: var(--muted); }
+.status-bar code, code { background: #0f1419; padding: 2px 6px; border-radius: 5px; color: var(--accent); }
+
+.result { display: flex; gap: 16px; }
+.result img { width: 200px; border-radius: 10px; object-fit: cover; }
+.meta { flex: 1; }
+.meta h2 { margin: 0 0 4px; font-size: 18px; }
+.res-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.res-btn {
+  display: flex; flex-direction: column; align-items: flex-start;
+  background: #0f1419; border: 1px solid var(--line); color: var(--fg); padding: 10px 14px;
+}
+.res-btn:hover { border-color: var(--accent); filter: none; }
+.res-btn span { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+.task-header { display: flex; align-items: center; justify-content: space-between; }
+.err-msg { font-size: 12px; color: var(--err); margin-top: 4px; max-width: 300px; word-break: break-all; line-height: 1.3; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: middle; }
+th { color: var(--muted); font-weight: 500; }
+.title-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress { background: #0f1419; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 4px; }
+.progress .bar { background: var(--accent); height: 100%; transition: width .3s; }
+.badge { font-size: 13px; }
+.badge.ok { color: var(--ok); }
+.badge.err { color: var(--err); }
+
+details summary { cursor: pointer; font-weight: 600; }
+details p { margin: 8px 0; }
+.hint { margin-left: 10px; font-size: 13px; color: var(--muted); }
+input[type=file] { color: var(--muted); flex: 1; }
+.cookie-method { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+.cookie-method h4 { margin: 0 0 4px; font-size: 15px; }
+.field { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.field label { width: 90px; color: var(--muted); font-size: 13px; font-family: monospace; }
+.field input { flex: 1; }
+
+/* 登录页 */
+body.center { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 36px; width: 340px; display: flex; flex-direction: column; gap: 14px; text-align: center;
+}
+.login-card h1 { margin: 0; font-size: 22px; }
+.login-card input { width: 100%; }

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X 视频下载器</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎬 X 视频下载器</h1>
+    <button class="link" id="logoutBtn">退出登录</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <input type="text" id="urlInput" placeholder="粘贴 X (Twitter) 分享链接，例如 https://x.com/user/status/123...">
+        <button id="parseBtn">解析</button>
+      </div>
+      <div class="status-bar" id="cfgBar"></div>
+      <div class="error" id="parseError"></div>
+    </section>
+
+    <section class="card hidden" id="resultCard">
+      <div class="result">
+        <img id="thumb" alt="封面">
+        <div class="meta">
+          <h2 id="vTitle"></h2>
+          <p class="muted" id="vUploader"></p>
+          <div id="resList" class="res-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <details id="settings">
+        <summary>⚙️ 设置 · 配置 cookies（解析受限视频必需）</summary>
+
+        <div class="cookie-method">
+          <h4>方式一：粘贴 token（推荐，最省事）</h4>
+          <p class="muted">登录 x.com → 按 <code>F12</code> → Application → Cookies → <code>https://x.com</code>，复制下面两个值：</p>
+          <div class="field"><label>auth_token</label><input type="text" id="authToken" placeholder="一长串字符（必填）"></div>
+          <div class="field"><label>ct0</label><input type="text" id="ct0Token" placeholder="建议填写，可留空"></div>
+          <button id="saveTokenBtn">保存</button>
+          <span class="hint" id="tokenHint"></span>
+        </div>
+
+        <div class="cookie-method">
+          <h4>方式二：上传 cookies.txt</h4>
+          <p class="muted">用浏览器扩展「Get cookies.txt LOCALLY」导出 Netscape 格式文件后上传。</p>
+          <div class="row">
+            <input type="file" id="cookieFile" accept=".txt">
+            <button id="uploadCookieBtn">上传</button>
+          </div>
+          <span class="hint" id="cookieHint"></span>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="task-header">
+        <h2>下载任务</h2>
+        <button class="link" id="clearTasksBtn">清空列表</button>
+      </div>
+      <table id="taskTable">
+        <thead>
+          <tr><th>标题</th><th>分辨率</th><th>状态 / 进度</th><th>操作</th></tr>
+        </thead>
+        <tbody id="taskBody">
+          <tr><td colspan="4" class="muted center">暂无任务</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
