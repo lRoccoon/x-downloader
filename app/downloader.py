@@ -59,9 +59,11 @@ def probe(url: str) -> dict:
         info = entries[0]
 
     formats = info.get("formats") or []
+    # X 的 http 直链（音视频合一）vcodec 为 None(未知)，不能按 vcodec 剔除；
+    # 纯音频流 vcodec 为 "none" 且无 height，两个条件都能把它筛掉
     video_formats = [
         f for f in formats
-        if f.get("vcodec") not in (None, "none") and f.get("height")
+        if f.get("vcodec") != "none" and f.get("height")
     ]
     if not video_formats:
         raise ValueError("该推文中没有可下载的视频")
@@ -82,8 +84,13 @@ def probe(url: str) -> dict:
     for h in sorted(best_by_height, reverse=True):
         f = best_by_height[h]
         size = f.get("filesize") or f.get("filesize_approx")
+        # HLS 视频变体不含音轨(acodec=="none")，拼上最佳音频交给 ffmpeg 合并；
+        # 万一没有独立音频流则回退纯视频
+        format_id = f["format_id"]
+        if f.get("acodec") == "none":
+            format_id = f"{format_id}+bestaudio/{format_id}"
         resolutions.append({
-            "format_id": f["format_id"],
+            "format_id": format_id,
             "height": h,
             "width": f.get("width"),
             "ext": f.get("ext", "mp4"),
