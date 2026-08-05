@@ -54,15 +54,21 @@ def create_task(url: str, title: str, format_id: str, resolution: str) -> str:
     return task_id
 
 
-def update_task(task_id: str, **fields) -> None:
+def update_task(task_id: str, only_if_status: str | None = None, **fields) -> None:
+    """only_if_status: 仅当任务当前处于该状态时才更新，用于并发写入方
+    （如进度轮询线程）避免覆盖已落定的终态/暂停态。"""
     if not fields:
         return
     fields["updated_at"] = time.time()
     cols = ", ".join(f"{k} = ?" for k in fields)
+    sql = f"UPDATE tasks SET {cols} WHERE id = ?"
     values = list(fields.values()) + [task_id]
+    if only_if_status:
+        sql += " AND status = ?"
+        values.append(only_if_status)
     with _lock:
         conn = _connect()
-        conn.execute(f"UPDATE tasks SET {cols} WHERE id = ?", values)
+        conn.execute(sql, values)
         conn.commit()
 
 

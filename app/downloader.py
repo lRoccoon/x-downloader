@@ -1,4 +1,6 @@
+import os
 import shutil
+import signal
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -11,6 +13,7 @@ from . import config, db
 _executor = ThreadPoolExecutor(max_workers=3)
 _aria2c = shutil.which("aria2c") is not None
 _pause_flags: dict[str, bool] = {}  # task_id -> True 表示请求暂停
+_task_tmpfiles: dict[str, str] = {}  # task_id -> 下载中的 .part 路径
 
 
 def _find_ffmpeg():
@@ -132,6 +135,81 @@ def _make_hook(task_id: str):
     return hook
 
 
+def _aria2_total_length(tmpfile: str) -> int | None:
+    """从 aria2 的控制文件读真实总大小（X 标称码率虚高，估算值可差数倍）。
+
+    .aria2 布局(BE)：版本 2B、扩展 4B、infoHash 长度 4B(http 下载为 0)、
+    piece 长度 4B、总长度 8B。格式对不上就放弃。
+    """
+    try:
+        with open(tmpfile + ".aria2", "rb") as f:
+            head = f.read(22)
+        if len(head) == 22 and head[0:2] == b"\x00\x01" \
+                and int.from_bytes(head[6:10], "big") == 0:
+            return int.from_bytes(head[14:22], "big") or None
+    except OSError:
+        pass
+    return None
+
+
+def _watch_aria2c_progress(task_id: str, tmpfile: str, est_total: int | None) -> None:
+    """aria2c 外部下载期间 yt-dlp 不回调进度，改为轮询 .part 文件落库。
+
+    多连接分段写入下 st_size 几秒内即达文件末尾，改用 st_blocks（稀疏
+    文件的真实写入量）计算进度与速度。
+    """
+    last_size, last_t = 0, time.time()
+    total = None
+    while _task_tmpfiles.get(task_id) == tmpfile and not _pause_flags.get(task_id):
+        time.sleep(2)
+        # sleep 期间任务可能已暂停/结束，写库前必须复查，且写入带状态守卫，
+        # 避免最后一拍把 paused/finished 覆盖回 downloading
+        if _task_tmpfiles.get(task_id) != tmpfile or _pause_flags.get(task_id):
+            break
+        try:
+            st = os.stat(tmpfile)
+        except OSError:
+            continue
+        size = st.st_blocks * 512
+        total = total or _aria2_total_length(tmpfile) or est_total
+        now = time.time()
+        speed = (size - last_size) / max(now - last_t, 0.1)
+        last_size, last_t = size, now
+        fields = dict(
+            speed=f"{speed / 1048576:.1f}MiB/s" if speed > 0 else None,
+        )
+        if total:
+            fields["progress"] = round(min(size / total * 100, 99.9), 1)
+            fields["filesize"] = total
+            if speed > 0:
+                remain = int(max(total - size, 0) / speed)
+                fields["eta"] = f"{remain // 60:02d}:{remain % 60:02d}"
+        db.update_task(task_id, only_if_status="downloading", **fields)
+
+
+def _kill_task_aria2c(task_id: str) -> None:
+    """终止某任务的 aria2c 子进程（外部下载器收不到暂停信号，只能杀进程）。
+
+    aria2c 默认 -c 续传且留有 .aria2 控制文件，SIGTERM 后可精确断点续传。
+    """
+    tmpfile = _task_tmpfiles.get(task_id)
+    if not tmpfile:
+        return
+    needle = os.path.basename(tmpfile).encode()
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            cmdline = open(f"/proc/{pid}/cmdline", "rb").read()
+        except OSError:
+            continue
+        if b"aria2c" in cmdline and needle in cmdline:
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except OSError:
+                pass
+
+
 def _run_download(task_id: str, url: str, format_id: str) -> None:
     _pause_flags.pop(task_id, None)
     db.update_task(task_id, status="downloading", progress=0, error=None)
@@ -154,12 +232,26 @@ def _run_download(task_id: str, url: str, format_id: str) -> None:
         }
     try:
         with YoutubeDL(opts) as ydl:
+            # 先解析（不下载）拿到目标文件名，供暂停杀进程与进度轮询定位 .part
+            info = ydl.extract_info(url, download=False)
+            if info.get("_type") == "playlist" and info.get("entries"):
+                info = next(e for e in info["entries"] if e)
+            tmpfile = ydl.prepare_filename(info) + ".part"
+            _task_tmpfiles[task_id] = tmpfile
+            protocol = info.get("protocol") or ""
+            if _aria2c and protocol.startswith("http") and "m3u8" not in protocol:
+                total = info.get("filesize") or info.get("filesize_approx")
+                threading.Thread(
+                    target=_watch_aria2c_progress,
+                    args=(task_id, tmpfile, total),
+                    daemon=True,
+                ).start()
+
             info = ydl.extract_info(url, download=True)
             if info.get("_type") == "playlist" and info.get("entries"):
                 info = next(e for e in info["entries"] if e)
             filepath = ydl.prepare_filename(info)
             # merge 后扩展名可能变为 mp4
-            import os
             if not os.path.exists(filepath):
                 base, _ = os.path.splitext(filepath)
                 if os.path.exists(base + ".mp4"):
@@ -178,7 +270,13 @@ def _run_download(task_id: str, url: str, format_id: str) -> None:
     except DownloadCancelled:
         db.update_task(task_id, status="paused", speed=None, eta=None)
     except Exception as exc:  # noqa: BLE001
-        db.update_task(task_id, status="error", error=str(exc)[:500])
+        if _pause_flags.get(task_id):
+            # aria2c 被暂停杀掉后 yt-dlp 抛 DownloadError，按暂停处理
+            db.update_task(task_id, status="paused", speed=None, eta=None)
+        else:
+            db.update_task(task_id, status="error", error=str(exc)[:500])
+    finally:
+        _task_tmpfiles.pop(task_id, None)
 
 
 def enqueue(url: str, title: str, format_id: str, resolution: str) -> str:
@@ -198,11 +296,18 @@ def retry(task_id: str) -> bool:
 
 
 def pause(task_id: str) -> bool:
-    """请求暂停一个下载中的任务（保留已下载分片，可续传）。"""
+    """请求暂停一个下载中的任务（保留已下载部分，可续传）。
+
+    HLS 分片下载靠 progress hook 检测 flag 生效；aria2c 外部下载全程无
+    hook 回调，需要直接终止 aria2c 进程。状态先置 pausing 给前端即时反馈，
+    真正落为 paused 由 _run_download 的异常分支完成。
+    """
     task = db.get_task(task_id)
     if not task or task.get("status") != "downloading":
         return False
     _pause_flags[task_id] = True
+    db.update_task(task_id, status="pausing", speed=None, eta=None)
+    _kill_task_aria2c(task_id)
     return True
 
 
