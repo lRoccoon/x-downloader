@@ -137,6 +137,9 @@ function renderTask(t) {
     const extra = [t.speed, t.eta ? `剩余 ${t.eta}` : ""].filter(Boolean).join(" · ");
     statusCell = `<div class="progress"><div class="bar" style="width:${t.progress}%"></div></div>
       <span class="small">${t.progress}% ${extra}</span>`;
+  } else if (t.status === "pausing") {
+    statusCell = `<div class="progress"><div class="bar paused" style="width:${t.progress}%"></div></div>
+      <span class="small">⏸ 暂停中…</span>`;
   } else if (t.status === "paused") {
     statusCell = `<div class="progress"><div class="bar paused" style="width:${t.progress}%"></div></div>
       <span class="small">⏸ 已暂停 · ${t.progress}%</span>`;
@@ -151,10 +154,13 @@ function renderTask(t) {
 
   let actions = "";
   if (t.status === "downloading") {
-    actions += `<button class="link" onclick="pauseTask('${t.id}')">暂停</button> `;
+    actions += `<button class="link" onclick="pauseTask('${t.id}', this)">暂停</button> `;
+  }
+  if (t.status === "pausing") {
+    actions += `<button class="link" disabled>暂停中…</button> `;
   }
   if (t.status === "paused") {
-    actions += `<button class="link" onclick="resumeTask('${t.id}')">继续</button> `;
+    actions += `<button class="link" onclick="resumeTask('${t.id}', this)">继续</button> `;
   }
   if (t.status === "finished") {
     actions += `<a class="link" href="/api/tasks/${t.id}/file">下载到本地</a> `;
@@ -183,12 +189,14 @@ async function retryTask(id) {
   refreshTasks();
 }
 
-async function pauseTask(id) {
+async function pauseTask(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "暂停中…"; }
   await fetch(`/api/tasks/${id}/pause`, { method: "POST" });
   refreshTasks();
 }
 
-async function resumeTask(id) {
+async function resumeTask(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "继续中…"; }
   await fetch(`/api/tasks/${id}/resume`, { method: "POST" });
   refreshTasks();
 }
